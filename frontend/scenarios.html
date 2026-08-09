@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LOSSLine — Meghana Scenarios</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <div id="app">
+    <nav id="sidebar">
+      <div class="logo">
+        <div class="logo-mark">LL</div>
+        <span>LOSSLine</span>
+      </div>
+      <div class="nav-label">Overview</div>
+      <a class="nav-item" href="index.html">Dashboard</a>
+      <a class="nav-item" href="location.html">Locations</a>
+      <a class="nav-item" href="index.html#branches">Branches</a>
+      <div class="nav-label">Intelligence</div>
+      <a class="nav-item" href="agent.html">Root Cause</a>
+      <div class="nav-label">AI</div>
+      <a class="nav-item" href="index.html">AI Copilot</a>
+      <div class="nav-label">Data</div>
+      <a class="nav-item" href="location.html">Seed locations</a>
+      <a class="nav-item active" href="scenarios.html">Meghana scenarios</a>
+      <div class="sidebar-foot">
+        <div class="avatar">RK</div>
+        <div>
+          <div class="sidebar-name">Rahul Kumar</div>
+          <div class="sidebar-role">Operations Manager</div>
+        </div>
+      </div>
+    </nav>
+
+    <main id="main">
+      <div class="page-head">
+        <div>
+          <h1 class="page-title">Meghana Scenarios</h1>
+          <div class="page-sub" id="page-sub">Koramangala · live kitchen truth demos G1–G6</div>
+        </div>
+        <div class="actions">
+          <div class="scenario-live" id="scenario-live-pill">Idle</div>
+          <a class="btn" href="index.html">Back to dashboard</a>
+        </div>
+      </div>
+
+      <div class="card scenario-panel" id="scenarios">
+        <div class="section-head">
+          <div>
+            <div class="section-title" style="margin:0">Live scenario runner · Koramangala</div>
+            <div class="scenario-brand-sub">Gold cases that prove LOSSLine understands real kitchen truth — not just a cancel spike.</div>
+          </div>
+        </div>
+        <div class="scenario-grid" id="scenario-grid"><div class="empty">Loading Meghana scenarios…</div></div>
+        <div class="scenario-stage" id="scenario-stage" hidden>
+          <div class="scenario-stage-head">
+            <div>
+              <div class="scenario-stage-id" id="stage-id">—</div>
+              <div class="scenario-stage-title" id="stage-title">—</div>
+            </div>
+            <div class="scenario-stage-verdict" id="stage-verdict">—</div>
+          </div>
+          <p class="scenario-stage-story" id="stage-story"></p>
+          <div class="scenario-beats" id="stage-beats"></div>
+          <div class="kitchen-strip" id="kitchen-strip"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <div class="section-title">Run log</div>
+        <div class="console" id="console-log"></div>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="js/scenarios.js"></script>
+</body>
+</html>

@@ -21,6 +21,9 @@ const state = {
   markers: [],
   selectedBranchId: null,
   copilotHistory: [],
+  locationCompare: null,
+  refreshing: false,
+  pollCount: 0,
 };
 
 function log(msg, kind = "") {
@@ -71,10 +74,13 @@ function buildCopilotContext() {
       name: b.name,
       risk: b.risk,
       revDelta: b.revDelta,
+      rating: b.rating,
       activeIncidents: b.activeIncidents,
       estimatedExposure: b.estimatedExposure,
       demo: b.demo,
+      seeded: b.seeded,
     })),
+    locationCompare: state.locationCompare,
     topIncidents: state.incidents.slice(0, 6).map((i) => ({
       id: i.id,
       storeId: i.storeId,
@@ -94,46 +100,72 @@ async function loadDetail(id) {
   return detail;
 }
 
-async function refresh() {
+async function refresh(opts = { heavy: false }) {
+  if (document.visibilityState === "hidden") return;
+  if (state.refreshing) return;
+  state.refreshing = true;
+
   try {
-    const [summary, metrics, list, activity, branches, kitchen] = await Promise.all([
+    // Core dashboard first — keep this small and fast
+    const [summary, metrics, list] = await Promise.all([
       apiGet("/api/summary"),
       apiGet("/api/metrics"),
-      apiGet("/api/incidents?limit=50"),
-      apiGet("/api/activity?days=7"),
-      apiGet("/api/branches"),
-      apiGet("/api/scenarios/kitchen"),
+      apiGet("/api/incidents?limit=30"),
     ]);
     state.summary = summary;
     state.metrics = metrics;
     state.incidents = list.incidents || [];
-    state.activity = activity;
-    state.branches = branches;
-    state.kitchen = kitchen.kitchen;
-    state.details.clear();
 
     renderKpis();
     renderMetrics();
-    renderChart();
     renderAlerts();
-    renderBranches();
-    await renderIncidents();
+    renderIncidents();
+    setConn(true);
+
+    // Heavier pieces only on first load / manual refresh / every few polls
+    if (opts.heavy || !state.branches || !state.activity) {
+      const [activity, branches, kitchen] = await Promise.all([
+        apiGet("/api/activity?days=7"),
+        apiGet("/api/branches"),
+        apiGet("/api/scenarios/kitchen").catch(() => ({ kitchen: null })),
+      ]);
+      state.activity = activity;
+      state.branches = branches;
+      state.kitchen = kitchen.kitchen;
+      renderChart();
+      renderBranches();
+    }
 
     const month = new Date().toLocaleString("en-US", {
       month: "short",
       year: "numeric",
     });
-    const outlets = branches?.branches?.length ?? 0;
-    const root = kitchen?.kitchen?.inferredRootCause;
+    const outlets = state.branches?.branches?.length ?? 0;
+    const root = state.kitchen?.inferredRootCause;
     setText(
       "page-sub",
       `Meghana Biryani · Koramangala · ${month} · ${outlets} outlets · kitchen=${root || "—"} · ${new Date().toLocaleTimeString()}`,
     );
-    setText("badge-branches", String(summary.branchesAtRisk ?? summary.activeCount ?? 0));
-    setConn(true);
+    setText(
+      "badge-branches",
+      String(summary.branchesAtRisk ?? summary.activeCount ?? 0),
+    );
+
+    // Compare snapshot for Copilot — once, not every poll
+    if (!state.locationCompare) {
+      const primaryId =
+        state.branches?.primaryStoreId || summary.storeId || "store_demo_01";
+      state.locationCompare = await apiGet(
+        `/api/locations/compare?a=meghana_jayanagar&b=${encodeURIComponent(
+          primaryId,
+        )}&narrative=0`,
+      ).catch(() => null);
+    }
   } catch (err) {
     setConn(false);
     log(`Refresh failed: ${err.message}`, "err");
+  } finally {
+    state.refreshing = false;
   }
 }
 
@@ -309,15 +341,9 @@ async function renderAlerts() {
     return;
   }
 
-  const cards = await Promise.all(
-    open.map(async (inc) => {
-      let detail = null;
-      try {
-        detail = await loadDetail(inc.id);
-      } catch {
-        detail = null;
-      }
-      const rec = detail?.recommendation;
+  box.innerHTML = open
+    .map((inc) => {
+      const rec = inc.recommendation;
       const reasons = Array.isArray(inc.baseline?.reasons)
         ? inc.baseline.reasons.join("; ")
         : "";
@@ -342,10 +368,8 @@ async function renderAlerts() {
             · ${fmtTime(inc.updatedAt)}
           </div>
         </article>`;
-    }),
-  );
-
-  box.innerHTML = cards.join("");
+    })
+    .join("");
 }
 
 function riskClass(risk) {
@@ -371,6 +395,10 @@ function renderBranches() {
       const deltaClass = b.revDelta < 0 ? "down" : "up";
       const delta =
         b.revDelta > 0 ? `+${b.revDelta}%` : `${b.revDelta}%`;
+      const liveTag =
+        b.seeded || b.demo === false
+          ? '<div class="branch-live-tag">Analytics</div>'
+          : '<div class="branch-live-tag" style="opacity:.55">Demo</div>';
       return `
         <article class="branch-card ${b.id === state.selectedBranchId ? "active" : ""}" data-branch="${b.id}">
           <div class="branch-card-top">
@@ -378,7 +406,7 @@ function renderBranches() {
               <div class="branch-icon">${b.icon || "📍"}</div>
               <div class="branch-name">${b.name}</div>
               <div class="branch-area">${b.area}</div>
-              ${b.demo === false ? '<div class="branch-live-tag">Live data</div>' : ""}
+              ${liveTag}
             </div>
             <span class="risk-pill ${riskClass(b.risk)}">${b.risk}</span>
           </div>
@@ -386,6 +414,9 @@ function renderBranches() {
             <span>★ ${Number(b.rating).toFixed(1)}</span>
             <span class="${deltaClass}">Rev ${delta}</span>
           </div>
+          <a class="branch-analytics-link" href="location.html?storeId=${encodeURIComponent(
+            b.id,
+          )}">Open analytics →</a>
         </article>`;
     })
     .join("");
@@ -442,31 +473,26 @@ function renderMap(list) {
     marker.on("click", () => {
       state.selectedBranchId = b.id;
       renderBranches();
+      window.location.href = `location.html?storeId=${encodeURIComponent(b.id)}`;
     });
     state.markers.push(marker);
   }
 }
 
-async function renderIncidents() {
+function renderIncidents() {
   const box = document.getElementById("incident-list");
   if (!box) return;
 
   if (!state.incidents.length) {
     box.innerHTML =
-      '<div class="empty">No incidents yet. Seed overload with Upload Data, then start the worker.</div>';
+      '<div class="empty">No incidents yet. Run a Meghana scenario (G2–G6), then start the worker.</div>';
     return;
   }
 
-  const cards = await Promise.all(
-    state.incidents.slice(0, 8).map(async (inc) => {
-      let detail = null;
-      try {
-        detail = await loadDetail(inc.id);
-      } catch {
-        detail = null;
-      }
-      const rec = detail?.recommendation;
-      const outcome = detail?.outcome;
+  box.innerHTML = state.incidents
+    .slice(0, 8)
+    .map((inc) => {
+      const rec = inc.recommendation;
       const actionable = inc.status === "AWAITING_APPROVAL";
       const verifying = inc.status === "VERIFYING";
       const reasons = Array.isArray(inc.baseline?.reasons)
@@ -490,11 +516,6 @@ async function renderIncidents() {
               ? `<div class="incident-body"><strong style="color:var(--text)">Recommend:</strong> ${rec.actionType}</div>`
               : ""
           }
-          ${
-            outcome
-              ? `<div class="incident-body" style="margin-top:6px">Outcome: <strong style="color:var(--text)">${outcome.verdict}</strong></div>`
-              : ""
-          }
           <div class="incident-actions">
             <a class="btn" href="agent.html?id=${inc.id}">Agent loop →</a>
             ${
@@ -515,10 +536,8 @@ async function renderIncidents() {
             }
           </div>
         </article>`;
-    }),
-  );
-
-  box.innerHTML = cards.join("");
+    })
+    .join("");
 }
 
 async function onClick(e) {
@@ -527,8 +546,12 @@ async function onClick(e) {
 
   const branch = t.closest("[data-branch]");
   if (branch) {
-    state.selectedBranchId = branch.getAttribute("data-branch");
+    // Let analytics link navigate; otherwise select + open location page
+    if (t.closest("a.branch-analytics-link")) return;
+    const id = branch.getAttribute("data-branch");
+    state.selectedBranchId = id;
     renderBranches();
+    window.location.href = `location.html?storeId=${encodeURIComponent(id)}`;
     return;
   }
 
@@ -545,7 +568,7 @@ async function onClick(e) {
         approvedBy: "ui_operator",
       });
       log(`Approved → ${r.status} (recovery events ${r.recoveryEvents})`, "ok");
-      await refresh();
+      await refresh({ heavy: true });
     }
     if (reject) {
       t.setAttribute("disabled", "true");
@@ -554,74 +577,24 @@ async function onClick(e) {
         reason: "rejected_via_ui",
       });
       log(`Rejected → ${r.status}`, "warn");
-      await refresh();
+      await refresh({ heavy: true });
     }
     if (evalId) {
       t.setAttribute("disabled", "true");
       log(`Evaluating outcome ${evalId}…`);
       const r = await apiPost(`/api/incidents/${evalId}/evaluate-outcome`);
       log(`Outcome → ${r.status || r.tick?.status}`, "ok");
-      await refresh();
+      await refresh({ heavy: true });
     }
     if (invest) {
       t.setAttribute("disabled", "true");
       log(`Kicking investigation ${invest}…`);
       const r = await apiPost(`/api/incidents/${invest}/investigate`);
       log(`Investigation → ${r.status}`, "ok");
-      await refresh();
+      await refresh({ heavy: true });
     }
   } catch (err) {
     log(err.message, "err");
-  }
-}
-
-async function seedDemo() {
-  const btn = document.getElementById("btn-demo");
-  if (btn) btn.disabled = true;
-  log("Seeding overload burst via /api/events…");
-
-  const now = Date.now();
-  const ago = (m) => new Date(now - m * 60_000).toISOString();
-  const events = [];
-
-  for (let i = 0; i < 12; i += 1) {
-    events.push({
-      type: "order",
-      payload: { orderId: `ui_${now}_${i}`, amount: 350 + i * 10 },
-      occurredAt: ago(14 - i),
-    });
-  }
-  for (let i = 0; i < 5; i += 1) {
-    events.push({
-      type: "prep_complete",
-      payload: { orderId: `ui_${now}_${i}`, prepMinutes: 22 + i },
-      occurredAt: ago(10 - i),
-    });
-  }
-  for (let i = 0; i < 4; i += 1) {
-    events.push({
-      type: "handoff",
-      payload: { orderId: `ui_${now}_${i}`, delayMinutes: 10 + i },
-      occurredAt: ago(8 - i),
-    });
-  }
-  for (const i of [1, 3, 5]) {
-    events.push({
-      type: "cancellation",
-      payload: { orderId: `ui_${now}_${i}`, reason: "too_long_wait" },
-      occurredAt: ago(6 - i * 0.2),
-    });
-  }
-
-  try {
-    const res = await apiPost("/api/events", { events });
-    log(`Ingested ${res.count ?? events.length} events`, "ok");
-    log("If worker is running, detection → investigation should follow.", "warn");
-    await refresh();
-  } catch (err) {
-    log(err.message, "err");
-  } finally {
-    if (btn) btn.disabled = false;
   }
 }
 
@@ -694,8 +667,11 @@ async function askCopilot(message) {
 }
 
 document.getElementById("main")?.addEventListener("click", onClick);
-document.getElementById("btn-refresh")?.addEventListener("click", () => refresh());
-document.getElementById("nav-seed")?.addEventListener("click", seedDemo);
+document.getElementById("btn-refresh")?.addEventListener("click", () => {
+  state.branches = null;
+  state.activity = null;
+  refresh({ heavy: true });
+});
 document.getElementById("btn-copilot")?.addEventListener("click", openCopilot);
 document.getElementById("nav-copilot")?.addEventListener("click", openCopilot);
 document.getElementById("copilot-close")?.addEventListener("click", closeCopilot);
@@ -713,151 +689,13 @@ document.querySelectorAll(".copilot-chips [data-prompt]").forEach((btn) => {
   });
 });
 
-function setScenarioPill(text, kind = "") {
-  const el = document.getElementById("scenario-live-pill");
-  if (!el) return;
-  el.textContent = text;
-  el.className = `scenario-live ${kind}`.trim();
-}
-
-function renderScenarioCards() {
-  const grid = document.getElementById("scenario-grid");
-  if (!grid) return;
-  const activeId = state.lastScenarioRun?.scenario?.id;
-
-  grid.innerHTML = state.scenarios
-    .map((s) => {
-      const expectClass = s.expectIncident ? "fire" : "quiet";
-      const expectLabel = s.expectIncident ? "Expect alert" : "Must stay quiet";
-      return `
-        <article class="scenario-card ${s.id === activeId ? "active" : ""}" data-scenario-card="${s.id}">
-          <div class="scenario-card-top">
-            <span class="scenario-id">${s.id}</span>
-            <span class="scenario-expect ${expectClass}">${expectLabel}</span>
-          </div>
-          <div class="scenario-name">${s.name}</div>
-          <div class="scenario-proves">Proves: <strong>${s.proves}</strong></div>
-          <button class="btn btn-primary" data-run-scenario="${s.id}">Play live</button>
-        </article>`;
-    })
-    .join("");
-}
-
-function renderScenarioStage(result) {
-  const stage = document.getElementById("scenario-stage");
-  if (!stage || !result?.scenario) return;
-  stage.hidden = false;
-
-  const s = result.scenario;
-  const kitchen = result.kitchen || {};
-  setText("stage-id", `${s.id} · ${s.proves}`);
-  setText("stage-title", s.name);
-  setText("stage-verdict", String(result.verdict || "—").replaceAll("_", " "));
-  setText("stage-story", s.story);
-
-  const beats = document.getElementById("stage-beats");
-  if (beats) {
-    beats.innerHTML = (s.liveBeats || [])
-      .map((b, i) => `<span class="beat" data-beat="${i}">${b}</span>`)
-      .join("");
-    [...beats.querySelectorAll(".beat")].forEach((el, i) => {
-      setTimeout(() => el.classList.add("on"), 350 * (i + 1));
-    });
-  }
-
-  const stock =
-    kitchen.stockouts?.length > 0
-      ? kitchen.stockouts.map((x) => x.name || x.sku).join(", ")
-      : kitchen.inventory?.length
-        ? "Healthy"
-        : "—";
-  const stockClass =
-    kitchen.stockouts?.length > 0
-      ? "bad"
-      : kitchen.inventory?.length
-        ? "ok"
-        : "";
-  const staff =
-    kitchen.cooksOnFloor != null
-      ? `${kitchen.cooksOnFloor}/${kitchen.cooksRequired ?? "?"} cooks`
-      : "—";
-  const staffClass =
-    kitchen.staffingStatus === "shortfall" ? "bad" : kitchen.cooksOnFloor != null ? "ok" : "";
-  const oversell = kitchen.deliveryOversell?.length
-    ? kitchen.deliveryOversell.map((d) => `${d.channel} +${d.oversellBy}`).join(", ")
-    : "None";
-  const oversellClass = kitchen.deliveryOversell?.length ? "warn" : "ok";
-  const root = kitchen.inferredRootCause || "—";
-  const rootClass =
-    root === "none" ? "ok" : root.includes("shortage") || root.includes("shortfall") || root.includes("oversell")
-      ? "warn"
-      : "";
-
-  const strip = document.getElementById("kitchen-strip");
-  if (strip) {
-    strip.innerHTML = `
-      <div class="kitchen-chip"><div class="k-label">Inventory</div><div class="k-value ${stockClass}">${stock}</div></div>
-      <div class="kitchen-chip"><div class="k-label">Staffing</div><div class="k-value ${staffClass}">${staff}</div></div>
-      <div class="kitchen-chip"><div class="k-label">Delivery oversell</div><div class="k-value ${oversellClass}">${oversell}</div></div>
-      <div class="kitchen-chip"><div class="k-label">Inferred root cause</div><div class="k-value ${rootClass}">${root.replaceAll("_", " ")}</div></div>
-    `;
-  }
-}
-
-async function loadScenarios() {
-  try {
-    const data = await apiGet("/api/scenarios");
-    state.scenarios = data.scenarios || [];
-    renderScenarioCards();
-  } catch (err) {
-    log(`Scenarios load failed: ${err.message}`, "err");
-    const grid = document.getElementById("scenario-grid");
-    if (grid) grid.innerHTML = `<div class="empty">${err.message}</div>`;
-  }
-}
-
-async function runScenario(id) {
-  setScenarioPill(`Running ${id}…`, "running");
-  log(`Playing Meghana scenario ${id}…`, "warn");
-  try {
-    const result = await apiPost("/api/scenarios/run", {
-      id,
-      wipe: true,
-      detect: true,
-    });
-    state.lastScenarioRun = result;
-    state.kitchen = result.kitchen;
-    renderScenarioCards();
-    renderScenarioStage(result);
-
-    const ok =
-      result.verdict === "QUIET_as_expected" ||
-      result.verdict === "DETECTED_as_expected";
-    setScenarioPill(
-      ok ? `${id} ✓ ${result.verdict}` : `${id} ! ${result.verdict}`,
-      ok ? "ok" : "bad",
-    );
-    log(
-      `${id} → ${result.verdict} · events ${result.eventsIngested} · root ${result.kitchen?.inferredRootCause}${
-        result.incident ? ` · incident ${result.incident.id}` : ""
-      }`,
-      ok ? "ok" : "warn",
-    );
-    await refresh();
-  } catch (err) {
-    setScenarioPill(`${id} failed`, "bad");
-    log(`Scenario ${id} failed: ${err.message}`, "err");
-  }
-}
-
-document.getElementById("scenario-grid")?.addEventListener("click", (e) => {
-  const t = e.target;
-  if (!(t instanceof HTMLElement)) return;
-  const id = t.getAttribute("data-run-scenario");
-  if (id) runScenario(id);
+refresh({ heavy: true });
+setInterval(() => {
+  state.pollCount += 1;
+  // Light poll most ticks; refresh map/activity every ~4th poll (~40s)
+  refresh({ heavy: state.pollCount % 4 === 0 });
+}, 10_000);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") refresh({ heavy: false });
 });
-
-loadScenarios();
-refresh();
-setInterval(refresh, 5000);
-log("Dashboard ready · Meghana G1–G6 live scenarios wired");
+log("Dashboard ready");

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LOSSLine — Location Analytics</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/app.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <nav id="sidebar">
+      <div class="logo">
+        <div class="logo-mark">LL</div>
+        <span>LOSSLine</span>
+      </div>
+      <div class="nav-label">Overview</div>
+      <a class="nav-item" href="index.html">Dashboard</a>
+      <a class="nav-item active" href="location.html">Locations</a>
+      <a class="nav-item" href="index.html#branches">Branches</a>
+      <div class="nav-label">Intelligence</div>
+      <a class="nav-item" href="agent.html">Root Cause</a>
+      <div class="nav-label">AI</div>
+      <a class="nav-item" href="index.html">AI Copilot</a>
+      <div class="nav-label">Data</div>
+      <a class="nav-item" href="location.html">Seed locations</a>
+      <a class="nav-item" href="scenarios.html">Meghana scenarios</a>
+      <div class="sidebar-foot">
+        <div class="avatar">RK</div>
+        <div>
+          <div class="sidebar-name">Rahul Kumar</div>
+          <div class="sidebar-role">Operations Manager</div>
+        </div>
+      </div>
+    </nav>
+
+    <main id="main">
+      <div class="page-head">
+        <div>
+          <h1 class="page-title">Location Analytics</h1>
+          <div class="page-sub" id="page-sub">Meghana Biryani · outlet deep dive</div>
+        </div>
+        <div class="actions">
+          <label class="loc-select-label">
+            Outlet
+            <select id="outlet-select" class="select"></select>
+          </label>
+          <button class="btn" id="btn-refresh" type="button">Refresh</button>
+          <button class="btn btn-primary" id="btn-seed" type="button">Seed portfolio</button>
+        </div>
+      </div>
+
+      <div class="card seed-banner" id="seed-banner">
+        <div>
+          <div class="section-title" style="margin:0">Load outlet history</div>
+          <div class="page-sub" style="margin-top:4px">
+            Seeds 7 days of POS, reviews, inventory &amp; staffing for Koramangala, Jayanagar, and Indiranagar so charts and compare work.
+          </div>
+          <div class="seed-status" id="seed-status">Not seeded this session</div>
+        </div>
+        <div class="seed-actions">
+          <label class="seed-check">
+            <input type="checkbox" id="seed-keep-primary" />
+            Keep Koramangala (don’t wipe live kitchen)
+          </label>
+          <button class="btn btn-primary" id="btn-seed-main" type="button">Seed portfolio data</button>
+        </div>
+      </div>
+
+      <div class="outlet-chips" id="outlet-chips"></div>
+
+      <div class="kpi-grid" id="pos-kpis">
+        <div class="card kpi-card">
+          <div class="kpi-label">Orders / min (15m)</div>
+          <div class="kpi-value" id="kpi-velocity">—</div>
+          <div class="kpi-hint" id="kpi-velocity-hint">POS velocity</div>
+        </div>
+        <div class="card kpi-card">
+          <div class="kpi-label">Prep time</div>
+          <div class="kpi-value" id="kpi-prep">—</div>
+          <div class="kpi-hint" id="kpi-prep-hint">Avg plate minutes</div>
+        </div>
+        <div class="card kpi-card">
+          <div class="kpi-label">Cancel rate</div>
+          <div class="kpi-value" id="kpi-cancel">—</div>
+          <div class="kpi-hint" id="kpi-cancel-hint">Last 15m</div>
+        </div>
+        <div class="card kpi-card">
+          <div class="kpi-label">Avg rating</div>
+          <div class="kpi-value" id="kpi-rating">—</div>
+          <div class="kpi-hint" id="kpi-rating-hint">7-day reviews</div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top:14px">
+        <div class="card chart-card">
+          <div class="section-head">
+            <div class="section-title" style="margin:0">POS activity (7d)</div>
+            <div class="chart-legend">
+              <span><i class="lg orders"></i> Orders</span>
+              <span><i class="lg cancels"></i> Cancels</span>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="pos-chart"></canvas>
+          </div>
+        </div>
+        <div class="card chart-card">
+          <div class="section-head">
+            <div class="section-title" style="margin:0">Review trend</div>
+            <span class="link-quiet" id="review-count-label">—</span>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="review-chart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top:14px">
+        <div class="card">
+          <div class="section-title">Inventory</div>
+          <div id="inventory-bars"><div class="empty">Loading…</div></div>
+          <div class="section-title" style="margin-top:16px">Staffing</div>
+          <div id="staffing-box" class="staffing-box">—</div>
+        </div>
+        <div class="card">
+          <div class="section-title">Recent reviews</div>
+          <div id="review-list"><div class="empty">Loading…</div></div>
+        </div>
+      </div>
+
+      <div class="card compare-panel" id="compare" style="margin-top:14px">
+        <div class="section-head">
+          <div>
+            <div class="section-title" style="margin:0">Why one outlet wins</div>
+            <div class="page-sub" style="margin-top:4px">Deterministic score deltas · optional Gemini narrative</div>
+          </div>
+          <div class="compare-controls">
+            <label>
+              A
+              <select id="compare-a" class="select"></select>
+            </label>
+            <label>
+              B
+              <select id="compare-b" class="select"></select>
+            </label>
+            <button class="btn btn-primary" id="btn-compare" type="button">Compare</button>
+          </div>
+        </div>
+        <div class="compare-scores" id="compare-scores"></div>
+        <p class="compare-narrative" id="compare-narrative">Pick two outlets to see why one is ahead.</p>
+        <div class="compare-reasons" id="compare-reasons"></div>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="js/location.js"></script>
+</body>
+</html>

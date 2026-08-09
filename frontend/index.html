@@ -21,14 +21,15 @@
       </div>
       <div class="nav-label">Overview</div>
       <a class="nav-item active" href="index.html">Dashboard</a>
+      <a class="nav-item" href="location.html">Locations</a>
       <a class="nav-item" href="#branches">Branches <span class="nav-badge danger" id="badge-branches">0</span></a>
       <div class="nav-label">Intelligence</div>
       <a class="nav-item" href="agent.html">Root Cause</a>
       <div class="nav-label">AI</div>
       <button type="button" class="nav-item" id="nav-copilot">AI Copilot</button>
       <div class="nav-label">Data</div>
-      <a class="nav-item" href="#scenarios">Meghana scenarios</a>
-      <button type="button" class="nav-item" id="nav-seed">Seed overload</button>
+      <a class="nav-item" href="location.html">Seed locations</a>
+      <a class="nav-item" href="scenarios.html">Meghana scenarios</a>
       <div class="sidebar-foot">
         <div class="avatar">RK</div>
         <div>
@@ -48,29 +49,6 @@
           <span class="status-pill" id="conn-pill"><span class="dot"></span> Connected</span>
           <button class="btn" id="btn-refresh">Refresh</button>
           <button class="btn btn-primary" id="btn-copilot">Ask Copilot</button>
-        </div>
-      </div>
-
-      <div class="card scenario-panel" id="scenarios">
-        <div class="section-head">
-          <div>
-            <div class="section-title" style="margin:0">Live scenario runner · Koramangala</div>
-            <div class="scenario-brand-sub">Gold cases that prove LOSSLine understands real kitchen truth — not just a cancel spike.</div>
-          </div>
-          <div class="scenario-live" id="scenario-live-pill">Idle</div>
-        </div>
-        <div class="scenario-grid" id="scenario-grid"><div class="empty">Loading Meghana scenarios…</div></div>
-        <div class="scenario-stage" id="scenario-stage" hidden>
-          <div class="scenario-stage-head">
-            <div>
-              <div class="scenario-stage-id" id="stage-id">—</div>
-              <div class="scenario-stage-title" id="stage-title">—</div>
-            </div>
-            <div class="scenario-stage-verdict" id="stage-verdict">—</div>
-          </div>
-          <p class="scenario-stage-story" id="stage-story"></p>
-          <div class="scenario-beats" id="stage-beats"></div>
-          <div class="kitchen-strip" id="kitchen-strip"></div>
         </div>
       </div>
 
@@ -123,8 +101,11 @@
 
       <div class="card" id="branches" style="margin-top:14px">
         <div class="section-head">
-          <div class="section-title" style="margin:0">Outlet Overview</div>
-          <span class="link-quiet" id="branch-count">—</span>
+          <div>
+            <div class="section-title" style="margin:0">Outlet Overview</div>
+            <span class="link-quiet" id="branch-count">—</span>
+          </div>
+          <a class="btn btn-primary" href="location.html" style="text-decoration:none">Seed / analytics →</a>
         </div>
         <div class="branch-layout">
           <div id="branch-map" class="branch-map" aria-label="Branch map"></div>
@@ -162,6 +143,7 @@
         <button class="btn btn-primary" type="submit">Send</button>
       </form>
       <div class="copilot-chips">
+        <button type="button" data-prompt="Why is Jayanagar beating Koramangala on reviews?">Jayanagar vs Koramangala</button>
         <button type="button" data-prompt="Is this a stockout or capacity pressure at Meghana Koramangala?">Stockout vs capacity</button>
         <button type="button" data-prompt="Explain the last Meghana scenario and the root cause.">Last scenario</button>
         <button type="button" data-prompt="Why is delivery oversell not a kitchen shortage?">Oversell ≠ shortage</button>
