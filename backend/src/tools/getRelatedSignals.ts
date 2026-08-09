@@ -6,6 +6,7 @@ import {
   type SignalType,
 } from "../services/confidence.js";
 import { getIncidentById } from "../services/detection.js";
+import { deriveKitchenState } from "../services/kitchenState.js";
 import { computeMetricsFromEvents } from "../services/metrics.js";
 import { getEventsSince } from "../services/events.js";
 
@@ -30,6 +31,7 @@ export async function getRelatedSignals(raw: unknown) {
   const long = computeMetricsFromEvents(longEvents, 60);
   const baselineVelocity = Math.max(long.order_velocity, 0.05);
   const velocitySpike = short.order_velocity / baselineVelocity;
+  const kitchen = deriveKitchenState(longEvents);
 
   const checked: Signal[] = [
     { type: "order_velocity" },
@@ -37,6 +39,9 @@ export async function getRelatedSignals(raw: unknown) {
     { type: "handoff_delay" },
     { type: "cancellations" },
     { type: "reviews" },
+    { type: "inventory_shortage" },
+    { type: "staffing_shortfall" },
+    { type: "delivery_oversell" },
   ];
 
   const confirmed: Signal[] = [];
@@ -79,15 +84,48 @@ export async function getRelatedSignals(raw: unknown) {
     details.reviews = { badReviewCount: badReviews.length };
   }
 
+  if (
+    kitchen.stockouts.length > 0 ||
+    kitchen.inferredRootCause === "inventory_shortage" ||
+    kitchen.inferredRootCause === "inventory_shortage_recovering"
+  ) {
+    confirmed.push({ type: "inventory_shortage" });
+    details.inventory_shortage = {
+      stockouts: kitchen.stockouts,
+      replenishments: kitchen.replenishments,
+      recovering: kitchen.inferredRootCause === "inventory_shortage_recovering",
+    };
+  }
+
+  if (
+    kitchen.inferredRootCause === "staffing_shortfall" ||
+    kitchen.staffingStatus === "shortfall"
+  ) {
+    confirmed.push({ type: "staffing_shortfall" });
+    details.staffing_shortfall = {
+      cooksOnFloor: kitchen.cooksOnFloor,
+      required: kitchen.cooksRequired,
+      status: kitchen.staffingStatus,
+    };
+  }
+
+  if (kitchen.deliveryOversell.length > 0) {
+    confirmed.push({ type: "delivery_oversell" });
+    details.delivery_oversell = kitchen.deliveryOversell;
+  }
+
   const confidence = calculateConfidence(checked, confirmed);
 
   return {
     storeId: input.storeId,
     incidentId: input.incidentId,
+    brand: "Meghana Biryani",
     checked: checked.map((s) => s.type),
     confirmed: confirmed.map((s) => s.type as SignalType),
     confidence,
     details,
     metrics_15m: short,
+    kitchen,
+    rootCauseHint: kitchen.inferredRootCause,
   };
 }

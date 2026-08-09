@@ -6,6 +6,7 @@ import { copilotRouter } from "./routes/copilot.js";
 import { eventsRouter } from "./routes/events.js";
 import { healthRouter } from "./routes/health.js";
 import { incidentsRouter } from "./routes/incidents.js";
+import { scenariosRouter } from "./routes/scenarios.js";
 import { summaryRouter } from "./routes/summary.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -23,6 +24,7 @@ export function createApp() {
   app.use(incidentsRouter);
   app.use(summaryRouter);
   app.use(copilotRouter);
+  app.use(scenariosRouter);
 
   // Simple HTML UI (Phase 4)
   console.log(`[boot] serving frontend from ${frontendDir}`);

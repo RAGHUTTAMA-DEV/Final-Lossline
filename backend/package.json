@@ -18,6 +18,7 @@
     "replay:reset:wipe": "tsx scripts/replay-reset.ts --wipe",
     "smoke:investigate": "tsx scripts/smoke-investigate.ts",
     "smoke:approve": "tsx scripts/smoke-approve.ts",
+    "replay:meghana": "tsx scripts/replay-meghana.ts",
     "typecheck": "tsc --noEmit"
   },
   "engines": {

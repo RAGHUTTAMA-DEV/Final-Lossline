@@ -1,6 +1,7 @@
 import { calculateRevenueExposure } from "./calculateRevenueExposure.js";
 import { getBaseline } from "./getBaseline.js";
 import { getIncidentHistory } from "./getIncidentHistory.js";
+import { getKitchenState } from "./getKitchenState.js";
 import { getMetrics } from "./getMetrics.js";
 import { getRecentEvents } from "./getRecentEvents.js";
 import { getRecommendationOptions } from "./getRecommendationOptions.js";
@@ -19,6 +20,8 @@ export async function executeTool(
       return getBaseline(input);
     case "get_related_signals":
       return getRelatedSignals(input);
+    case "get_kitchen_state":
+      return getKitchenState(input);
     case "get_incident_history":
       return getIncidentHistory(input);
     case "calculate_revenue_exposure":

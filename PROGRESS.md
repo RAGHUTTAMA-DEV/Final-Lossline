@@ -84,11 +84,15 @@ Source of truth for product scope: [lossline-prd.md](./lossline-prd.md)
 - `index.html` — Executive dashboard: KPIs, Chart.js activity timeline, active alerts, Leaflet outlet map + branch cards, incident feed, Copilot drawer
 - `agent.html` — status pipeline + decision graph (agent_runs tools → recommendation → action → outcome)
 - APIs: `GET /api/summary`, `GET /api/metrics`, `GET /api/activity`, `GET /api/branches`, `POST /api/copilot`
+- **Meghana Biryani gold scenarios G1–G6** — live runner on dashboard + `POST /api/scenarios/run` + `npm run replay:meghana -- G3`
+  - G1 quiet lunch (no false shortage) · G2 capacity · G3 stockout · G4 replenishment · G5 staffing · G6 delivery oversell
+  - Kitchen truth events: inventory / staffing / replenishment / delivery_accept
+  - Agent tool `get_kitchen_state` distinguishes root causes
 
 ### Explicitly not done yet
 
 - WebSocket / SSE live push (UI polls every 4–5s for now)
-- Full multi-store ingestion (portfolio companions are demo + live primary store)
+- Full multi-store ingestion (portfolio companions are demo + live Koramangala)
 - CSV upload UI
 
 ---

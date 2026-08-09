@@ -12,6 +12,9 @@ const state = {
   incidents: [],
   activity: null,
   branches: null,
+  scenarios: [],
+  lastScenarioRun: null,
+  kitchen: null,
   details: new Map(),
   chart: null,
   map: null,
@@ -46,11 +49,23 @@ function setConn(ok) {
 
 function buildCopilotContext() {
   return {
+    brand: "Meghana Biryani",
+    outlet: "Koramangala",
     summary: state.summary,
     metrics15m: state.metrics?.windows?.["15m"] ?? null,
     estimatedExposure: state.summary?.estimatedExposure ?? 0,
     activeCount: state.summary?.activeCount ?? 0,
     activity: state.activity?.series ?? [],
+    kitchen: state.kitchen,
+    lastScenario: state.lastScenarioRun
+      ? {
+          id: state.lastScenarioRun.scenario?.id,
+          name: state.lastScenarioRun.scenario?.name,
+          proves: state.lastScenarioRun.scenario?.proves,
+          verdict: state.lastScenarioRun.verdict,
+          rootCause: state.lastScenarioRun.kitchen?.inferredRootCause,
+        }
+      : null,
     branches: (state.branches?.branches || []).map((b) => ({
       id: b.id,
       name: b.name,
@@ -66,6 +81,8 @@ function buildCopilotContext() {
       status: i.status,
       type: i.type,
       reasons: i.baseline?.reasons ?? [],
+      scenarioId: i.baseline?.scenarioId ?? null,
+      kitchenRootCause: i.baseline?.kitchenRootCause ?? null,
     })),
   };
 }
@@ -79,18 +96,20 @@ async function loadDetail(id) {
 
 async function refresh() {
   try {
-    const [summary, metrics, list, activity, branches] = await Promise.all([
+    const [summary, metrics, list, activity, branches, kitchen] = await Promise.all([
       apiGet("/api/summary"),
       apiGet("/api/metrics"),
       apiGet("/api/incidents?limit=50"),
       apiGet("/api/activity?days=7"),
       apiGet("/api/branches"),
+      apiGet("/api/scenarios/kitchen"),
     ]);
     state.summary = summary;
     state.metrics = metrics;
     state.incidents = list.incidents || [];
     state.activity = activity;
     state.branches = branches;
+    state.kitchen = kitchen.kitchen;
     state.details.clear();
 
     renderKpis();
@@ -105,9 +124,10 @@ async function refresh() {
       year: "numeric",
     });
     const outlets = branches?.branches?.length ?? 0;
+    const root = kitchen?.kitchen?.inferredRootCause;
     setText(
       "page-sub",
-      `${month} · ${outlets} outlets · Last refreshed ${new Date().toLocaleTimeString()}`,
+      `Meghana Biryani · Koramangala · ${month} · ${outlets} outlets · kitchen=${root || "—"} · ${new Date().toLocaleTimeString()}`,
     );
     setText("badge-branches", String(summary.branchesAtRisk ?? summary.activeCount ?? 0));
     setConn(true);
@@ -675,7 +695,6 @@ async function askCopilot(message) {
 
 document.getElementById("main")?.addEventListener("click", onClick);
 document.getElementById("btn-refresh")?.addEventListener("click", () => refresh());
-document.getElementById("btn-demo")?.addEventListener("click", seedDemo);
 document.getElementById("nav-seed")?.addEventListener("click", seedDemo);
 document.getElementById("btn-copilot")?.addEventListener("click", openCopilot);
 document.getElementById("nav-copilot")?.addEventListener("click", openCopilot);
@@ -694,6 +713,151 @@ document.querySelectorAll(".copilot-chips [data-prompt]").forEach((btn) => {
   });
 });
 
+function setScenarioPill(text, kind = "") {
+  const el = document.getElementById("scenario-live-pill");
+  if (!el) return;
+  el.textContent = text;
+  el.className = `scenario-live ${kind}`.trim();
+}
+
+function renderScenarioCards() {
+  const grid = document.getElementById("scenario-grid");
+  if (!grid) return;
+  const activeId = state.lastScenarioRun?.scenario?.id;
+
+  grid.innerHTML = state.scenarios
+    .map((s) => {
+      const expectClass = s.expectIncident ? "fire" : "quiet";
+      const expectLabel = s.expectIncident ? "Expect alert" : "Must stay quiet";
+      return `
+        <article class="scenario-card ${s.id === activeId ? "active" : ""}" data-scenario-card="${s.id}">
+          <div class="scenario-card-top">
+            <span class="scenario-id">${s.id}</span>
+            <span class="scenario-expect ${expectClass}">${expectLabel}</span>
+          </div>
+          <div class="scenario-name">${s.name}</div>
+          <div class="scenario-proves">Proves: <strong>${s.proves}</strong></div>
+          <button class="btn btn-primary" data-run-scenario="${s.id}">Play live</button>
+        </article>`;
+    })
+    .join("");
+}
+
+function renderScenarioStage(result) {
+  const stage = document.getElementById("scenario-stage");
+  if (!stage || !result?.scenario) return;
+  stage.hidden = false;
+
+  const s = result.scenario;
+  const kitchen = result.kitchen || {};
+  setText("stage-id", `${s.id} · ${s.proves}`);
+  setText("stage-title", s.name);
+  setText("stage-verdict", String(result.verdict || "—").replaceAll("_", " "));
+  setText("stage-story", s.story);
+
+  const beats = document.getElementById("stage-beats");
+  if (beats) {
+    beats.innerHTML = (s.liveBeats || [])
+      .map((b, i) => `<span class="beat" data-beat="${i}">${b}</span>`)
+      .join("");
+    [...beats.querySelectorAll(".beat")].forEach((el, i) => {
+      setTimeout(() => el.classList.add("on"), 350 * (i + 1));
+    });
+  }
+
+  const stock =
+    kitchen.stockouts?.length > 0
+      ? kitchen.stockouts.map((x) => x.name || x.sku).join(", ")
+      : kitchen.inventory?.length
+        ? "Healthy"
+        : "—";
+  const stockClass =
+    kitchen.stockouts?.length > 0
+      ? "bad"
+      : kitchen.inventory?.length
+        ? "ok"
+        : "";
+  const staff =
+    kitchen.cooksOnFloor != null
+      ? `${kitchen.cooksOnFloor}/${kitchen.cooksRequired ?? "?"} cooks`
+      : "—";
+  const staffClass =
+    kitchen.staffingStatus === "shortfall" ? "bad" : kitchen.cooksOnFloor != null ? "ok" : "";
+  const oversell = kitchen.deliveryOversell?.length
+    ? kitchen.deliveryOversell.map((d) => `${d.channel} +${d.oversellBy}`).join(", ")
+    : "None";
+  const oversellClass = kitchen.deliveryOversell?.length ? "warn" : "ok";
+  const root = kitchen.inferredRootCause || "—";
+  const rootClass =
+    root === "none" ? "ok" : root.includes("shortage") || root.includes("shortfall") || root.includes("oversell")
+      ? "warn"
+      : "";
+
+  const strip = document.getElementById("kitchen-strip");
+  if (strip) {
+    strip.innerHTML = `
+      <div class="kitchen-chip"><div class="k-label">Inventory</div><div class="k-value ${stockClass}">${stock}</div></div>
+      <div class="kitchen-chip"><div class="k-label">Staffing</div><div class="k-value ${staffClass}">${staff}</div></div>
+      <div class="kitchen-chip"><div class="k-label">Delivery oversell</div><div class="k-value ${oversellClass}">${oversell}</div></div>
+      <div class="kitchen-chip"><div class="k-label">Inferred root cause</div><div class="k-value ${rootClass}">${root.replaceAll("_", " ")}</div></div>
+    `;
+  }
+}
+
+async function loadScenarios() {
+  try {
+    const data = await apiGet("/api/scenarios");
+    state.scenarios = data.scenarios || [];
+    renderScenarioCards();
+  } catch (err) {
+    log(`Scenarios load failed: ${err.message}`, "err");
+    const grid = document.getElementById("scenario-grid");
+    if (grid) grid.innerHTML = `<div class="empty">${err.message}</div>`;
+  }
+}
+
+async function runScenario(id) {
+  setScenarioPill(`Running ${id}…`, "running");
+  log(`Playing Meghana scenario ${id}…`, "warn");
+  try {
+    const result = await apiPost("/api/scenarios/run", {
+      id,
+      wipe: true,
+      detect: true,
+    });
+    state.lastScenarioRun = result;
+    state.kitchen = result.kitchen;
+    renderScenarioCards();
+    renderScenarioStage(result);
+
+    const ok =
+      result.verdict === "QUIET_as_expected" ||
+      result.verdict === "DETECTED_as_expected";
+    setScenarioPill(
+      ok ? `${id} ✓ ${result.verdict}` : `${id} ! ${result.verdict}`,
+      ok ? "ok" : "bad",
+    );
+    log(
+      `${id} → ${result.verdict} · events ${result.eventsIngested} · root ${result.kitchen?.inferredRootCause}${
+        result.incident ? ` · incident ${result.incident.id}` : ""
+      }`,
+      ok ? "ok" : "warn",
+    );
+    await refresh();
+  } catch (err) {
+    setScenarioPill(`${id} failed`, "bad");
+    log(`Scenario ${id} failed: ${err.message}`, "err");
+  }
+}
+
+document.getElementById("scenario-grid")?.addEventListener("click", (e) => {
+  const t = e.target;
+  if (!(t instanceof HTMLElement)) return;
+  const id = t.getAttribute("data-run-scenario");
+  if (id) runScenario(id);
+});
+
+loadScenarios();
 refresh();
 setInterval(refresh, 5000);
-log("Dashboard ready · Chart.js + map + Copilot wired");
+log("Dashboard ready · Meghana G1–G6 live scenarios wired");

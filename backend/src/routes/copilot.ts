@@ -125,8 +125,9 @@ copilotRouter.post("/api/copilot", async (req, res) => {
     try {
       const llm = createLLMClient();
       const system = [
-        "You are LOSSLine AI Copilot — an operations analyst for cloud-kitchen / QSR overload incidents.",
-        "Answer briefly (2–6 sentences). Use only the CONTEXT JSON. Prefer concrete numbers, store IDs, statuses, and recommended actions.",
+        "You are LOSSLine AI Copilot for Meghana Biryani (Koramangala + sister outlets).",
+        "Answer briefly (2–6 sentences). Use only the CONTEXT JSON. Prefer concrete numbers, scenario IDs (G1–G6), root causes, and recommended actions.",
+        "Gold distinctions: stockout ≠ staffing ≠ delivery oversell ≠ capacity pressure. G1 must stay quiet (no false shortage).",
         "If data is missing, say what is unknown. Do not invent incidents. Currency is INR (₹).",
         "CONTEXT:",
         JSON.stringify({ server: serverCtx, dashboard: context ?? null }, null, 0),

@@ -56,7 +56,7 @@ export const investigationTools: ToolDef[] = [
   {
     name: "get_related_signals",
     description:
-      "Check correlated overload signals for this incident. Returns checked/confirmed signals and a deterministic confidence percentage — use this confidence, do not invent one.",
+      "Check correlated overload signals for this incident including Meghana inventory/staffing/delivery-oversell. Returns checked/confirmed signals and a deterministic confidence percentage — use this confidence, do not invent one.",
     parameters: {
       type: "object",
       properties: {
@@ -64,6 +64,22 @@ export const investigationTools: ToolDef[] = [
         incidentId: { type: "string" },
       },
       required: ["storeId", "incidentId"],
+    },
+  },
+  {
+    name: "get_kitchen_state",
+    description:
+      "Meghana Biryani kitchen truth: inventory on-hand, stockouts, replenishments, staffing headcount, delivery oversell vs slot cap, and inferred root cause. Call this to distinguish stockout vs capacity vs staffing vs aggregator oversell.",
+    parameters: {
+      type: "object",
+      properties: {
+        storeId: { type: "string" },
+        sinceMinutes: {
+          type: "number",
+          description: "Lookback in minutes (default 60, max 180)",
+        },
+      },
+      required: ["storeId"],
     },
   },
   {

@@ -17,6 +17,10 @@ export const EVENT_TYPES = [
   "handoff",
   "cancellation",
   "review",
+  "inventory_snapshot",
+  "staffing_snapshot",
+  "replenishment",
+  "delivery_accept",
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];

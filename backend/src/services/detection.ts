@@ -1,6 +1,8 @@
 import { env } from "../config/env.js";
 import { pool } from "../db/pool.js";
 import type { Incident, IncidentStatus, IncidentType } from "../types/index.js";
+import { getEventsSince } from "./events.js";
+import { deriveKitchenState } from "./kitchenState.js";
 import {
   type MetricSnapshot,
   updateRollingMetrics,
@@ -21,6 +23,7 @@ export interface OverloadResult {
   short: MetricSnapshot;
   long: MetricSnapshot;
   velocitySpike: number;
+  kitchenRootCause?: string;
 }
 
 interface IncidentRow {
@@ -49,6 +52,8 @@ export async function checkOverloadThresholds(
   storeId: string,
 ): Promise<OverloadResult> {
   const { short, long } = await updateRollingMetrics(storeId);
+  const recent = await getEventsSince(storeId, new Date(Date.now() - 60 * 60_000));
+  const kitchen = deriveKitchenState(recent);
 
   const reasons: string[] = [];
   const baselineVelocity = Math.max(long.order_velocity, 0.05);
@@ -87,10 +92,49 @@ export async function checkOverloadThresholds(
     );
   }
 
-  // Overload = at least 2 signals, or cancel rate + prep (classic cascade)
-  const overloaded = reasons.length >= 2;
+  if (kitchen.stockouts.length > 0) {
+    reasons.push(
+      `inventory_shortage: ${kitchen.stockouts.map((s) => s.name || s.sku).join(", ")} onHand=0`,
+    );
+  }
+  if (
+    kitchen.staffingStatus === "shortfall" ||
+    (kitchen.cooksOnFloor != null &&
+      kitchen.cooksRequired != null &&
+      kitchen.cooksOnFloor < kitchen.cooksRequired)
+  ) {
+    reasons.push(
+      `staffing_shortfall: ${kitchen.cooksOnFloor}/${kitchen.cooksRequired} cooks on floor`,
+    );
+  }
+  if (kitchen.deliveryOversell.length > 0) {
+    const d = kitchen.deliveryOversell[0];
+    reasons.push(
+      `delivery_oversell: ${d.channel} accepted ${d.accepted} vs slot cap ${d.kitchenSlotCap}`,
+    );
+  }
 
-  return { overloaded, reasons, short, long, velocitySpike };
+  // Classic overload = ≥2 signals. Meghana root-cause paths also fire with
+  // one kitchen-truth signal + one operational symptom (cancel/prep/handoff).
+  const kitchenReasons = reasons.filter(
+    (r) =>
+      r.startsWith("inventory_shortage") ||
+      r.startsWith("staffing_shortfall") ||
+      r.startsWith("delivery_oversell"),
+  );
+  const opsReasons = reasons.filter((r) => !kitchenReasons.includes(r));
+  const overloaded =
+    reasons.length >= 2 ||
+    (kitchenReasons.length >= 1 && opsReasons.length >= 1);
+
+  return {
+    overloaded,
+    reasons,
+    short,
+    long,
+    velocitySpike,
+    kitchenRootCause: kitchen.inferredRootCause,
+  };
 }
 
 export async function hasOpenIncident(
@@ -116,8 +160,10 @@ export async function createIncident(
 
   const baseline = {
     detectedAt: new Date().toISOString(),
+    brand: "Meghana Biryani",
     reasons: overload.reasons,
     velocitySpike: overload.velocitySpike,
+    kitchenRootCause: overload.kitchenRootCause ?? null,
     metrics_15m: overload.short,
     metrics_60m: overload.long,
     thresholds: {

@@ -27,6 +27,7 @@
       <div class="nav-label">AI</div>
       <button type="button" class="nav-item" id="nav-copilot">AI Copilot</button>
       <div class="nav-label">Data</div>
+      <a class="nav-item" href="#scenarios">Meghana scenarios</a>
       <button type="button" class="nav-item" id="nav-seed">Seed overload</button>
       <div class="sidebar-foot">
         <div class="avatar">RK</div>
@@ -40,14 +41,36 @@
     <main id="main">
       <div class="page-head">
         <div>
-          <h1 class="page-title">Executive Dashboard</h1>
+          <h1 class="page-title">Meghana Biryani · Ops</h1>
           <div class="page-sub" id="page-sub">Connecting…</div>
         </div>
         <div class="actions">
           <span class="status-pill" id="conn-pill"><span class="dot"></span> Connected</span>
           <button class="btn" id="btn-refresh">Refresh</button>
-          <button class="btn" id="btn-demo">Upload Data</button>
           <button class="btn btn-primary" id="btn-copilot">Ask Copilot</button>
+        </div>
+      </div>
+
+      <div class="card scenario-panel" id="scenarios">
+        <div class="section-head">
+          <div>
+            <div class="section-title" style="margin:0">Live scenario runner · Koramangala</div>
+            <div class="scenario-brand-sub">Gold cases that prove LOSSLine understands real kitchen truth — not just a cancel spike.</div>
+          </div>
+          <div class="scenario-live" id="scenario-live-pill">Idle</div>
+        </div>
+        <div class="scenario-grid" id="scenario-grid"><div class="empty">Loading Meghana scenarios…</div></div>
+        <div class="scenario-stage" id="scenario-stage" hidden>
+          <div class="scenario-stage-head">
+            <div>
+              <div class="scenario-stage-id" id="stage-id">—</div>
+              <div class="scenario-stage-title" id="stage-title">—</div>
+            </div>
+            <div class="scenario-stage-verdict" id="stage-verdict">—</div>
+          </div>
+          <p class="scenario-stage-story" id="stage-story"></p>
+          <div class="scenario-beats" id="stage-beats"></div>
+          <div class="kitchen-strip" id="kitchen-strip"></div>
         </div>
       </div>
 
@@ -139,9 +162,9 @@
         <button class="btn btn-primary" type="submit">Send</button>
       </form>
       <div class="copilot-chips">
-        <button type="button" data-prompt="Why is revenue at risk high right now?">Revenue at risk</button>
-        <button type="button" data-prompt="Summarize active alerts and what to approve first.">Active alerts</button>
-        <button type="button" data-prompt="Which outlets are at risk and why?">Branch risk</button>
+        <button type="button" data-prompt="Is this a stockout or capacity pressure at Meghana Koramangala?">Stockout vs capacity</button>
+        <button type="button" data-prompt="Explain the last Meghana scenario and the root cause.">Last scenario</button>
+        <button type="button" data-prompt="Why is delivery oversell not a kitchen shortage?">Oversell ≠ shortage</button>
       </div>
     </div>
   </div>
