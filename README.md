@@ -86,7 +86,7 @@ flowchart LR
   human -->|approve| execute[Simulated execute_action]
   execute -->|VERIFYING| outcome[Outcome poller]
   outcome -->|RESOLVED / NOT_IMPROVED| pg
-  investigate --> pg
+  investigate --> p
   human --> pg
 ```
 
