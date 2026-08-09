@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LOSSLine — Executive Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="css/app.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+  <div id="app">
+    <nav id="sidebar">
+      <div class="logo">
+        <div class="logo-mark">LL</div>
+        <span>LOSSLine</span>
+      </div>
+      <div class="nav-label">Overview</div>
+      <a class="nav-item active" href="index.html">Dashboard</a>
+      <a class="nav-item" href="#branches">Branches <span class="nav-badge danger" id="badge-branches">0</span></a>
+      <div class="nav-label">Intelligence</div>
+      <a class="nav-item" href="agent.html">Root Cause</a>
+      <div class="nav-label">AI</div>
+      <button type="button" class="nav-item" id="nav-copilot">AI Copilot</button>
+      <div class="nav-label">Data</div>
+      <button type="button" class="nav-item" id="nav-seed">Seed overload</button>
+      <div class="sidebar-foot">
+        <div class="avatar">RK</div>
+        <div>
+          <div class="sidebar-name">Rahul Kumar</div>
+          <div class="sidebar-role">Operations Manager</div>
+        </div>
+      </div>
+    </nav>
+
+    <main id="main">
+      <div class="page-head">
+        <div>
+          <h1 class="page-title">Executive Dashboard</h1>
+          <div class="page-sub" id="page-sub">Connecting…</div>
+        </div>
+        <div class="actions">
+          <span class="status-pill" id="conn-pill"><span class="dot"></span> Connected</span>
+          <button class="btn" id="btn-refresh">Refresh</button>
+          <button class="btn" id="btn-demo">Upload Data</button>
+          <button class="btn btn-primary" id="btn-copilot">Ask Copilot</button>
+        </div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="card kpi-card">
+          <div class="kpi-label">Total Incidents</div>
+          <div class="kpi-value" id="kpi-total">—</div>
+          <div class="kpi-hint" id="kpi-total-hint">Loading…</div>
+        </div>
+        <div class="card kpi-card">
+          <div class="kpi-label">Active Alerts</div>
+          <div class="kpi-value" id="kpi-active">—</div>
+          <div class="kpi-hint" id="kpi-active-hint">Loading…</div>
+        </div>
+        <div class="card kpi-card">
+          <div class="kpi-label">Resolved</div>
+          <div class="kpi-value" id="kpi-resolved">—</div>
+          <div class="kpi-hint" id="kpi-resolved-hint">Loading…</div>
+        </div>
+        <div class="card kpi-card danger-card">
+          <div class="kpi-label">Revenue at Risk</div>
+          <div class="kpi-value" id="kpi-exposure">—</div>
+          <div class="kpi-hint" id="kpi-exposure-hint">Loading…</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card chart-card">
+          <div class="section-head">
+            <div class="section-title" style="margin:0">Incident Activity Timeline</div>
+            <div class="chart-legend">
+              <span><i class="lg orders"></i> Orders</span>
+              <span><i class="lg cancels"></i> Cancels</span>
+              <span><i class="lg revenue"></i> Revenue</span>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="activity-chart"></canvas>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-head">
+            <div class="section-title" style="margin:0">Active Alerts</div>
+            <a class="link-quiet" href="agent.html">View all →</a>
+          </div>
+          <div id="alert-list"><div class="empty">Loading…</div></div>
+        </div>
+      </div>
+
+      <div class="card" id="branches" style="margin-top:14px">
+        <div class="section-head">
+          <div class="section-title" style="margin:0">Outlet Overview</div>
+          <span class="link-quiet" id="branch-count">—</span>
+        </div>
+        <div class="branch-layout">
+          <div id="branch-map" class="branch-map" aria-label="Branch map"></div>
+          <div id="branch-cards" class="branch-cards"><div class="empty">Loading outlets…</div></div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top:14px">
+        <div class="card">
+          <div class="section-title">Incident feed</div>
+          <div id="incident-list"><div class="empty">Loading…</div></div>
+        </div>
+        <div class="card">
+          <div class="section-title">Live metrics (15m)</div>
+          <div id="metrics-box"><div class="empty">Loading…</div></div>
+          <div class="section-title" style="margin-top:16px">Activity log</div>
+          <div class="console" id="console-log"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="copilot-drawer" class="copilot-drawer" aria-hidden="true">
+    <div class="copilot-panel">
+      <div class="copilot-head">
+        <div>
+          <div class="copilot-title">AI Copilot</div>
+          <div class="copilot-sub">Context-aware · live dashboard snapshot</div>
+        </div>
+        <button type="button" class="btn" id="copilot-close">Close</button>
+      </div>
+      <div id="copilot-messages" class="copilot-messages"></div>
+      <form id="copilot-form" class="copilot-form">
+        <input id="copilot-input" type="text" placeholder="Ask about alerts, revenue at risk, a branch…" autocomplete="off" />
+        <button class="btn btn-primary" type="submit">Send</button>
+      </form>
+      <div class="copilot-chips">
+        <button type="button" data-prompt="Why is revenue at risk high right now?">Revenue at risk</button>
+        <button type="button" data-prompt="Summarize active alerts and what to approve first.">Active alerts</button>
+        <button type="button" data-prompt="Which outlets are at risk and why?">Branch risk</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/dashboard.js"></script>
+</body>
+</html>

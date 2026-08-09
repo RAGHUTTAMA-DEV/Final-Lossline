@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LOSSLine — Agent Loop</title>
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <div id="app">
+    <nav id="sidebar">
+      <div class="logo">
+        <div class="logo-mark">LL</div>
+        <span>LOSSLine</span>
+      </div>
+      <div class="nav-label">Overview</div>
+      <a class="nav-item" href="index.html">Dashboard</a>
+      <a class="nav-item" href="index.html#branches">Branches</a>
+      <div class="nav-label">Intelligence</div>
+      <a class="nav-item active" href="agent.html">Root Cause</a>
+      <div class="nav-label">AI</div>
+      <a class="nav-item" href="index.html">AI Copilot</a>
+      <div class="sidebar-foot">
+        <div class="avatar">RK</div>
+        <div>
+          <div class="sidebar-name">Rahul Kumar</div>
+          <div class="sidebar-role">Operations Manager</div>
+        </div>
+      </div>
+    </nav>
+
+    <main id="main">
+      <div id="incident-header" style="margin-bottom:16px">
+        <div class="page-title">Agent loop</div>
+        <div class="page-sub">Loading…</div>
+      </div>
+
+      <div class="card" style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+          <div class="section-title" style="margin:0">Status pipeline</div>
+          <label style="font-size:12px;color:var(--muted);display:flex;gap:8px;align-items:center">
+            Incident
+            <select id="incident-select" class="select"></select>
+          </label>
+        </div>
+        <div class="pipeline" id="pipeline"></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="section-title">Decision graph</div>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:12px">
+            Graph grows as the agent calls tools, then continues through approval → execute → outcome.
+          </p>
+          <div class="step-graph" id="step-graph">
+            <div class="empty">Loading agent runs…</div>
+          </div>
+        </div>
+        <div class="card" id="side-panel">
+          <div class="empty">Baseline appears here</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="js/agent.js"></script>
+</body>
+</html>
