@@ -81,6 +81,46 @@ export async function getLatestRecommendation(
   };
 }
 
+/** One query for many incidents — avoids N+1 on dashboard list/summary. */
+export async function getLatestRecommendationsMap(
+  incidentIds: string[],
+): Promise<Map<string, Recommendation>> {
+  const map = new Map<string, Recommendation>();
+  if (!incidentIds.length) return map;
+
+  const result = await pool.query<{
+    id: string;
+    incident_id: string;
+    confidence: number;
+    explanation: string;
+    action_type: string;
+    estimated_exposure: string | null;
+    created_at: Date;
+  }>(
+    `SELECT DISTINCT ON (incident_id)
+        id, incident_id, confidence, explanation, action_type,
+        estimated_exposure, created_at
+     FROM recommendations
+     WHERE incident_id = ANY($1::uuid[])
+     ORDER BY incident_id, created_at DESC`,
+    [incidentIds],
+  );
+
+  for (const row of result.rows) {
+    map.set(row.incident_id, {
+      id: row.id,
+      incidentId: row.incident_id,
+      confidence: row.confidence,
+      explanation: row.explanation,
+      actionType: row.action_type,
+      estimatedExposure:
+        row.estimated_exposure !== null ? Number(row.estimated_exposure) : null,
+      createdAt: row.created_at,
+    });
+  }
+  return map;
+}
+
 const VALID_ACTIONS = new Set([
   "pause_delivery",
   "call_in_prep_staff",

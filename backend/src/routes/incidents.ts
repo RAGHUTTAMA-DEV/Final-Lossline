@@ -6,7 +6,10 @@ import { approveIncident, rejectIncident } from "../services/approval.js";
 import { listAgentRuns } from "../services/agentRuns.js";
 import { getIncidentById, listIncidents } from "../services/detection.js";
 import { getLatestOutcome } from "../services/outcomes.js";
-import { getLatestRecommendation } from "../services/recommendations.js";
+import {
+  getLatestRecommendation,
+  getLatestRecommendationsMap,
+} from "../services/recommendations.js";
 
 export const incidentsRouter = Router();
 
@@ -32,16 +35,28 @@ incidentsRouter.get("/api/incidents", async (req, res) => {
 
   try {
     const incidents = await listIncidents(limit);
+    const recMap = await getLatestRecommendationsMap(incidents.map((i) => i.id));
     res.json({
-      incidents: incidents.map((i) => ({
-        id: i.id,
-        storeId: i.storeId,
-        type: i.type,
-        status: i.status,
-        baseline: i.baseline,
-        createdAt: i.createdAt,
-        updatedAt: i.updatedAt,
-      })),
+      incidents: incidents.map((i) => {
+        const rec = recMap.get(i.id);
+        return {
+          id: i.id,
+          storeId: i.storeId,
+          type: i.type,
+          status: i.status,
+          baseline: i.baseline,
+          createdAt: i.createdAt,
+          updatedAt: i.updatedAt,
+          recommendation: rec
+            ? {
+                confidence: rec.confidence,
+                explanation: rec.explanation,
+                actionType: rec.actionType,
+                estimatedExposure: rec.estimatedExposure,
+              }
+            : null,
+        };
+      }),
     });
   } catch (err) {
     console.error("[incidents] list failed:", err);

@@ -19,6 +19,8 @@
     "smoke:investigate": "tsx scripts/smoke-investigate.ts",
     "smoke:approve": "tsx scripts/smoke-approve.ts",
     "replay:meghana": "tsx scripts/replay-meghana.ts",
+    "seed:portfolio": "tsx scripts/seed-portfolio.ts",
+    "seed:portfolio:keep-primary": "tsx scripts/seed-portfolio.ts --keep-primary",
     "typecheck": "tsc --noEmit"
   },
   "engines": {

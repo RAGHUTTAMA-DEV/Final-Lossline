@@ -109,22 +109,100 @@ export async function updateRollingMetrics(storeId: string): Promise<{
     "handoff_delay",
   ];
 
-  for (const metric of metrics) {
-    await upsertRollingMetric(storeId, metric, 15, {
-      value: short[metric],
-      ...pickCounts(short),
-    });
-    await upsertRollingMetric(storeId, metric, 60, {
-      value: long[metric],
-      ...pickCounts(long),
-    });
-  }
+  // Parallel upserts — sequential writes were slow on Neon
+  await Promise.all(
+    metrics.flatMap((metric) => [
+      upsertRollingMetric(storeId, metric, 15, {
+        value: short[metric],
+        ...pickCounts(short),
+      }),
+      upsertRollingMetric(storeId, metric, 60, {
+        value: long[metric],
+        ...pickCounts(long),
+      }),
+    ]),
+  );
 
-  // Convenience aggregate row for detectors / UI
   await upsertRollingMetric(storeId, "order_velocity", 15, {
     value: short.order_velocity,
     snapshot: short,
+    longSnapshot: long,
   });
+
+  return { short, long };
+}
+
+/** Fast SQL aggregates for UI — no row hydrate, no writes. */
+export async function queryMetricsWindow(
+  storeId: string,
+  windowMinutes: number,
+): Promise<MetricSnapshot> {
+  const result = await pool.query<{
+    orders: string;
+    cancels: string;
+    prep_avg: string | null;
+    handoff_avg: string | null;
+    prep_n: string;
+    handoff_n: string;
+  }>(
+    `SELECT
+       COUNT(*) FILTER (WHERE type = 'order')::int AS orders,
+       COUNT(*) FILTER (WHERE type = 'cancellation')::int AS cancels,
+       AVG((payload->>'prepMinutes')::numeric) FILTER (WHERE type = 'prep_complete') AS prep_avg,
+       AVG((payload->>'delayMinutes')::numeric) FILTER (WHERE type = 'handoff') AS handoff_avg,
+       COUNT(*) FILTER (WHERE type = 'prep_complete' AND payload ? 'prepMinutes')::int AS prep_n,
+       COUNT(*) FILTER (WHERE type = 'handoff' AND payload ? 'delayMinutes')::int AS handoff_n
+     FROM events
+     WHERE store_id = $1
+       AND occurred_at >= NOW() - ($2::int * INTERVAL '1 minute')`,
+    [storeId, windowMinutes],
+  );
+  const row = result.rows[0];
+  const orders = Number(row?.orders) || 0;
+  const cancels = Number(row?.cancels) || 0;
+  const prepSamples = Number(row?.prep_n) || 0;
+  const handoffSamples = Number(row?.handoff_n) || 0;
+  return {
+    order_velocity: round4(windowMinutes > 0 ? orders / windowMinutes : 0),
+    prep_time: round4(Number(row?.prep_avg) || 0),
+    cancellation_rate: round4(orders > 0 ? cancels / orders : 0),
+    handoff_delay: round4(Number(row?.handoff_avg) || 0),
+    order_count: orders,
+    cancellation_count: cancels,
+    prep_samples: prepSamples,
+    handoff_samples: handoffSamples,
+  };
+}
+
+/**
+ * UI-facing metrics: reuse cache if fresh (<25s), else SQL windows (no heavy hydrate).
+ * Detection loop still uses updateRollingMetrics for truth writes.
+ */
+export async function getMetricsForUi(storeId: string): Promise<{
+  short: MetricSnapshot;
+  long: MetricSnapshot;
+}> {
+  const cached = await getRollingMetric(storeId, "order_velocity", 15);
+  const ageMs = cached
+    ? Date.now() - new Date(cached.updatedAt).getTime()
+    : Number.POSITIVE_INFINITY;
+  const snap = cached?.value?.snapshot as MetricSnapshot | undefined;
+  const longSnap = cached?.value?.longSnapshot as MetricSnapshot | undefined;
+  if (snap && longSnap && ageMs < 25_000) {
+    return { short: snap, long: longSnap };
+  }
+
+  const [short, long] = await Promise.all([
+    queryMetricsWindow(storeId, 15),
+    queryMetricsWindow(storeId, 60),
+  ]);
+
+  // Fire-and-forget cache refresh — don't block the response
+  void upsertRollingMetric(storeId, "order_velocity", 15, {
+    value: short.order_velocity,
+    snapshot: short,
+    longSnapshot: long,
+  }).catch(() => undefined);
 
   return { short, long };
 }

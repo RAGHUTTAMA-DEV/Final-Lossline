@@ -6,6 +6,7 @@ import { copilotRouter } from "./routes/copilot.js";
 import { eventsRouter } from "./routes/events.js";
 import { healthRouter } from "./routes/health.js";
 import { incidentsRouter } from "./routes/incidents.js";
+import { locationsRouter } from "./routes/locations.js";
 import { scenariosRouter } from "./routes/scenarios.js";
 import { summaryRouter } from "./routes/summary.js";
 
@@ -23,6 +24,7 @@ export function createApp() {
   app.use(eventsRouter);
   app.use(incidentsRouter);
   app.use(summaryRouter);
+  app.use(locationsRouter);
   app.use(copilotRouter);
   app.use(scenariosRouter);
 

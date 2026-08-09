@@ -101,8 +101,33 @@ function fallbackAnswer(
     const m = serverCtx.metrics15m;
     return `Last 15m on ${serverCtx.storeId}: velocity ${Number(m.order_velocity).toFixed(2)}/min, prep ${Number(m.prep_time).toFixed(1)}m, cancel ${(Number(m.cancellation_rate) * 100).toFixed(1)}%, handoff ${Number(m.handoff_delay).toFixed(1)}m.`;
   }
+  if (q.includes("jayanagar") || q.includes("better") || q.includes("compare")) {
+    const cmp = clientCtx?.locationCompare as
+      | {
+          winner?: string | null;
+          scoreA?: number;
+          scoreB?: number;
+          a?: { storeId: string; name: string };
+          b?: { storeId: string; name: string };
+          reasons?: Array<{ note: string }>;
+        }
+      | undefined;
+    if (cmp?.reasons?.length) {
+      const winner =
+        cmp.winner === cmp.a?.storeId
+          ? cmp.a?.name ?? "A"
+          : cmp.winner === cmp.b?.storeId
+            ? cmp.b?.name ?? "B"
+            : "Neither clearly";
+      return `${winner} leads on health (${cmp.scoreA} vs ${cmp.scoreB}). ${cmp.reasons
+        .slice(0, 3)
+        .map((r) => r.note)
+        .join(" ")} Open Locations for full charts.`;
+    }
+    return "Open Location Analytics and compare Jayanagar vs Koramangala — scores come from reviews, cancels, prep, and stockouts.";
+  }
   if (q.includes("branch") || q.includes("location") || q.includes("outlet")) {
-    return `Primary live outlet is ${serverCtx.storeId} with ${active} open incident(s). Portfolio cards on the dashboard blend this live store with companion demo locations for the multi-branch view.`;
+    return `Primary live outlet is ${serverCtx.storeId} with ${active} open incident(s). Seeded analytics cover Koramangala, Jayanagar, and Indiranagar — open the Locations page to compare.`;
   }
 
   return `I see ${active} open incident(s) and ~₹${Number(exposure).toLocaleString("en-IN")} exposure on ${serverCtx.storeId}. Ask about alerts, metrics, revenue at risk, or a branch — or set GEMINI_API_KEY for fuller Copilot answers.`;

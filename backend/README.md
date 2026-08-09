@@ -8,7 +8,8 @@ Express + TypeScript API for operational overload detection, Gemini-powered inve
 **Phase 1:** ingestion + deterministic detection → `DETECTED` incidents.  
 **Phase 2:** Gemini agent loop + 7 tools → `AWAITING_APPROVAL`.  
 **Phase 3:** approve / reject / simulated execute / outcome poller → `RESOLVED` | `NOT_IMPROVED`.  
-**Phase 4:** simple HTML UI at `/` + `/agent.html` (agent-loop graph).
+**Phase 4:** simple HTML UI at `/` + `/agent.html` (agent-loop graph).  
+**Location analytics:** `/location.html` — per-outlet POS / reviews / inventory + Jayanagar vs Koramangala compare.
 
 ## Quick start
 
@@ -20,12 +21,13 @@ cp .env.example .env
 
 npm install
 npm run db:migrate
+npm run seed:portfolio   # 7-day history for Koramangala + Jayanagar + Indiranagar
 npm run dev          # API + UI :3001
 npm run dev:worker   # detection + investigation + outcome
 ```
 
 Then:
-- UI: `http://localhost:3001/` (dashboard) · `http://localhost:3001/agent.html` (agent loop)
+- UI: `http://localhost:3001/` (dashboard) · `http://localhost:3001/location.html` (outlets) · `http://localhost:3001/agent.html` (agent loop)
 - Health: `GET http://localhost:3001/health`
 
 ### Phase 1–3 smoke
